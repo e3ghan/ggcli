@@ -19,8 +19,8 @@ pub struct Player {
 }
 
 pub fn process_csv(csv_opts: &CsvOpts) -> anyhow::Result<Vec<Value>> {
-    if !csv_opts.delimiter.is_ascii() {
-        anyhow::bail!("CSV delimiter must be an ASCII character");
+    if !csv_opts.delimiter.is_ascii() || matches!(csv_opts.delimiter, '\0' | '\r' | '\n' | '"') {
+        anyhow::bail!("CSV delimiter must be an ASCII character other than NUL, CR, LF, or quote");
     }
     let delimiter = csv_opts.delimiter as u8;
 
