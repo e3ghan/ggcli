@@ -4,9 +4,6 @@ mod process;
 pub use cli::{
     Cli, 
     Subcommands, 
-    CsvOpts,
-    OutputFormats,
-    PassGenOpts,
 };
 
 

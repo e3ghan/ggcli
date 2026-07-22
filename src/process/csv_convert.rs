@@ -4,7 +4,7 @@ use csv::ReaderBuilder;
 use serde_json::{Map, Value};
 use std::path::{Path, PathBuf};
 
-use crate::CsvOpts;
+use crate::cli::CsvOpts;
 
 // #[derive(Debug, Serialize, Deserialize)]
 // #[serde(rename_all = "PascalCase")]

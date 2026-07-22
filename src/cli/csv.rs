@@ -1,23 +1,6 @@
+use clap::Args;
 use std::path;
 use std::str::FromStr;
-
-use clap::{Args, Parser, Subcommand};
-
-#[derive(Debug, Parser)]
-#[command(version, about, long_about = None)]
-pub struct Cli {
-    #[command(subcommand)]
-    pub cmd: Subcommands,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum Subcommands {
-    #[command(name = "csv", about = "Process a CSV file")]
-    Csv(CsvOpts),
-
-    #[command(name = "passgen", about = "Generate a password")]
-    PassGen(PassGenOpts),
-}
 
 #[derive(Debug, Args)]
 pub struct CsvOpts {
@@ -47,29 +30,13 @@ pub struct CsvOpts {
     pub format: OutputFormats,
 }
 
+
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormats {
     Json,
     Yaml,
 }
 
-#[derive(Debug, Args)]
-pub struct PassGenOpts {
-    #[arg(long, default_value_t = 12, help = "Length of the password")]
-    pub length: u8,
-
-    #[arg(long, action = clap::ArgAction::SetTrue, help = "Disable lowercase letters")]
-    pub no_lowercase: bool,
-
-    #[arg(long, action = clap::ArgAction::SetTrue, help = "Disable uppercase letters")]
-    pub no_uppercase: bool,
-
-    #[arg(long, action = clap::ArgAction::SetTrue, help = "Disable numbers")]
-    pub no_numbers: bool,
-
-    #[arg(long, action = clap::ArgAction::SetTrue, help = "Disable symbols")]
-    pub no_symbols: bool,
-}
 
 impl From<OutputFormats> for &'static str {
     fn from(format: OutputFormats) -> Self {
@@ -91,8 +58,6 @@ impl FromStr for OutputFormats {
         }
     }
 }
-
-
 
 
 fn parse_input_file(s: &str) -> Result<String, String> {

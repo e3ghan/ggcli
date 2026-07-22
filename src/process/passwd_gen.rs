@@ -1,7 +1,7 @@
 ﻿use rand::prelude::*;
 use zxcvbn::zxcvbn;
 
-use crate::PassGenOpts;
+use crate::cli::PassGenOpts;
 
 const LOWERCASE: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
 const UPPERCASE: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ";

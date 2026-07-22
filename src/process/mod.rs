@@ -1,5 +1,5 @@
-pub mod csv_convert;
-pub mod passwd_gen;
+mod csv_convert;
+mod passwd_gen;
 
 
 pub use csv_convert::process_csv;
