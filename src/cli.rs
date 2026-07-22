@@ -1,6 +1,7 @@
 use std::path;
+use std::str::FromStr;
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -20,7 +21,7 @@ pub struct CsvOpts {
     #[arg(short, long, help = "Input file path for the CSV file", value_parser = parse_input_file)]
     pub input: String,
 
-    #[arg(short, long, help = "Output file path; defaults to output.<format>")]
+    #[arg(short, long, help = "Output path; default output.<format>; bare name gets .<format>")]
     pub output: Option<String>,
 
     #[arg(
@@ -39,45 +40,48 @@ pub struct CsvOpts {
     )]
     pub header: bool,
 
-    #[arg(
-        short,
-        long,
-        value_enum,
-        ignore_case = true,
-        default_value = "json",
-        help = "Output format"
-    )]
-    pub format: OutputFormat,
+    #[arg(long ,value_parser = format_parse , default_value = "json", help = "Output format for the Csv file")]
+    pub format: OutputFormats,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum OutputFormat {
+#[derive(Debug, Clone, Copy)]
+pub enum OutputFormats {
     Json,
-    Csv,
-    Toml,
+    Yaml,
 }
 
-impl OutputFormat {
-    pub const fn extension(self) -> &'static str {
-        match self {
-            Self::Json => "json",
-            Self::Csv => "csv",
-            Self::Toml => "toml",
+impl From<OutputFormats> for &'static str {
+    fn from(format: OutputFormats) -> Self {
+        match format {
+            OutputFormats::Json => "json",
+            OutputFormats::Yaml => "yaml",
         }
     }
 }
 
-impl CsvOpts {
-    pub fn output_path(&self) -> String {
-        self.output
-            .clone()
-            .unwrap_or_else(|| format!("output.{}", self.format.extension()))
+impl FromStr for OutputFormats {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "json" => Ok(OutputFormats::Json),
+            "yaml" => Ok(OutputFormats::Yaml),
+            _ => Err(anyhow::anyhow!("Invalid output format: {}", s)),
+        }
     }
 }
+
+
+
+
 fn parse_input_file(s: &str) -> Result<String, String> {
     if path::Path::new(s).exists() {
         Ok(s.to_string())
     } else {
         Err(format!("Input file '{}' does not exist", s))
     }
+}
+
+fn format_parse(format: &str) -> Result<OutputFormats, anyhow::Error> {
+    format.parse()
 }
