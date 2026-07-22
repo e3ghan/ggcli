@@ -1,11 +1,13 @@
 mod cli;
 
-pub use cli::{Cli, CsvOpts, OutputFormat, Subcommands};
-
-mod output;
-
-pub use output::format_output;
+pub use cli::{
+    Cli, 
+    Subcommands, 
+    CsvOpts,
+    OutputFormats
+};
 
 mod process;
 
-pub use process::{CsvData, process_csv};
+// pub use process::Player;
+pub use process::process_csv;

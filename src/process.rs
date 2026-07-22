@@ -1,116 +1,63 @@
-use std::collections::HashSet;
-use std::io::Read;
-
+use anyhow::Ok;
 use csv::ReaderBuilder;
+// use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use std::path::{Path, PathBuf};
 
 use crate::CsvOpts;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CsvData {
-    pub headers: Vec<String>,
-    pub records: Vec<Vec<String>>,
-    pub has_headers: bool,
-    pub delimiter: u8,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// #[serde(rename_all = "PascalCase")]
+// pub struct Player {
+//     pub name: String,
+//     pub position: String,
+//     #[serde(rename = "DOB")]
+//     pub dob: String,
+//     pub nationality: String,
+//     #[serde(rename = "Kit Number")]
+//     pub number: u8,
+// }
 
-pub fn process_csv(csv_opts: &CsvOpts) -> anyhow::Result<CsvData> {
-    let delimiter = validate_delimiter(csv_opts.delimiter)?;
-    let input = std::fs::File::open(&csv_opts.input)?;
-    process_reader(input, delimiter, csv_opts.header)
-}
-
-fn validate_delimiter(delimiter: char) -> anyhow::Result<u8> {
-    if !delimiter.is_ascii() || matches!(delimiter, '\0' | '\r' | '\n' | '"') {
-        anyhow::bail!("CSV delimiter must be an ASCII character other than NUL, CR, LF, or quote");
-    }
-
-    Ok(delimiter as u8)
-}
-
-fn process_reader<R: Read>(reader: R, delimiter: u8, has_headers: bool) -> anyhow::Result<CsvData> {
+pub fn process_csv(csv_opts: &CsvOpts) -> anyhow::Result<(PathBuf, String)> {
     let mut rdr = ReaderBuilder::new()
-        .delimiter(delimiter)
-        .has_headers(has_headers)
-        .flexible(true)
-        .from_reader(reader);
+        .delimiter(csv_opts.delimiter as u8)
+        .has_headers(csv_opts.header)
+        .from_path(&csv_opts.input)?;
 
-    // `headers()` always reads the first row. When `has_headers` is false,
-    // that row is still returned by `records()`, so use it only to determine
-    // the number of columns and generate stable names for the data rows.
-    let first_row: Vec<String> = rdr.headers()?.iter().map(str::to_owned).collect();
-    let headers = if has_headers {
-        first_row
-    } else {
-        (1..=first_row.len())
-            .map(|index| format!("column_{index}"))
-            .collect()
+    let headers = rdr.headers().cloned()?;
+
+    let values = rdr
+        .records()
+        .map(|result| {
+            let record = result?;
+            let object: Map<String, Value> = headers
+                .iter()
+                .zip(record.iter())
+                .map(|(header, field)| (header.to_string(), Value::String(field.to_string())))
+                .collect::<Map<String, Value>>();
+            Ok(Value::Object(object))
+        })
+        .collect::<Result<Vec<Value>, _>>()?;
+
+    let output_path = match &csv_opts.output {
+        Some(path) => {
+            let path = Path::new(&path);
+            if path.extension().is_none() {
+                let mut path_ext = path.to_path_buf();
+                path_ext.set_extension(Into::<&str>::into(csv_opts.format));
+                path_ext
+            } else {
+                path.to_path_buf()
+            }
+        }
+        None => PathBuf::from(format!("output.{}", Into::<&str>::into(csv_opts.format))),
     };
 
-    let mut seen = HashSet::new();
-    for header in &headers {
-        if !seen.insert(header.as_str()) {
-            anyhow::bail!("duplicate CSV header: {header}");
-        }
-    }
+    let res_content: String = match output_path.extension().and_then(|ext| ext.to_str()) {
+        Some("json") => serde_json::to_string_pretty(&values)?,
+        Some("yaml") => serde_yaml::to_string(&values)?,
+        _ => return Err(anyhow::anyhow!("Invalid output format")),
+    };
 
-    let records = rdr
-        .records()
-        .enumerate()
-        .map(|(row_index, record)| -> anyhow::Result<Vec<String>> {
-            let record = record?;
-            if record.len() != headers.len() {
-                anyhow::bail!(
-                    "record {} has {} fields, expected {}",
-                    row_index + 1,
-                    record.len(),
-                    headers.len()
-                );
-            }
-
-            Ok(record.iter().map(str::to_owned).collect())
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    Ok(CsvData {
-        headers,
-        records,
-        has_headers,
-        delimiter,
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{CsvData, process_reader, validate_delimiter};
-
-    #[test]
-    fn reads_csv_with_headers() {
-        let data = process_reader("name,age\nAda,42\n".as_bytes(), b',', true).unwrap();
-
-        assert_eq!(
-            data,
-            CsvData {
-                headers: vec!["name".into(), "age".into()],
-                records: vec![vec!["Ada".into(), "42".into()]],
-                has_headers: true,
-                delimiter: b',',
-            }
-        );
-    }
-
-    #[test]
-    fn generates_column_names_without_headers() {
-        let data = process_reader("Ada,42\n".as_bytes(), b',', false).unwrap();
-
-        assert_eq!(data.headers, vec!["column_1", "column_2"]);
-        assert_eq!(data.records, vec![vec!["Ada", "42"]]);
-        assert!(!data.has_headers);
-    }
-
-    #[test]
-    fn rejects_invalid_delimiters() {
-        assert!(validate_delimiter('，').is_err());
-        assert!(validate_delimiter('\n').is_err());
-        assert!(validate_delimiter('"').is_err());
-    }
+    Ok((output_path, res_content))
 }
